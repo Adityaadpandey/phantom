@@ -48,3 +48,16 @@ def test_noise_events_emitted_every_turn(net):
     events = bus.emit(turn=3, newly_compromised=[])
     # Noise events should always be emitted
     assert len(events) >= 1
+
+from phantom.intelligent_siem import IntelligentSIEMBus
+
+@pytest.mark.asyncio
+async def test_intelligent_siem_emit_returns_events(net):
+    from phantom.gpt_client import GPTClient
+    from unittest.mock import AsyncMock, patch
+    client = GPTClient("gpt-4o", "gpt-4o-mini")
+    bus = IntelligentSIEMBus(net, rng=random.Random(42), injection_rate=0.0, gpt_client=client)
+    with patch.object(client, "generate", new=AsyncMock(return_value="Normal backup completed successfully")):
+        events = await bus.emit_async(turn=1, newly_compromised=[])
+    assert len(events) >= 1
+    assert all(isinstance(e, SIEMEvent) for e in events)
