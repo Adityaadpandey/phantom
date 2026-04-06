@@ -1,6 +1,6 @@
 from __future__ import annotations
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 
 @dataclass
@@ -25,6 +25,8 @@ class NetworkState:
         self.edges = edges
         self._adj: dict[str, list[str]] = {h: [] for h in hosts}
         for a, b in edges:
+            if a not in self._adj or b not in self._adj:
+                raise ValueError(f"Edge ({a!r}, {b!r}) references unknown host(s)")
             self._adj[a].append(b)
             self._adj[b].append(a)
 
@@ -243,7 +245,7 @@ def _enterprise(rng: random.Random) -> NetworkState:
     # Management
     hosts["mgmt-01"] = _make_host("mgmt-01", "10.3.0.5", "jump-server-01",
                                    ["ssh"], "Linux", "management")
-    hosts["siem-01"] = _make_host("siem-01", "10.3.0.10", "siem-01",
+    hosts["siem-01"] = _make_host("siem-01", "10.3.0.10", "siem-server-01",
                                    ["syslog", "https"], "Linux", "management")
     hosts["nac-01"] = _make_host("nac-01", "10.3.0.15", "nac-server-01",
                                   ["radius"], "Linux", "management")
@@ -257,6 +259,7 @@ def _enterprise(rng: random.Random) -> NetworkState:
         ("web-04", "app-04"), ("web-05", "app-05"),
         ("app-01", "db-01"), ("app-02", "db-01"), ("app-03", "db-02"),
         ("app-04", "db-03"), ("app-05", "db-03"), ("app-06", "vault-01"),
+        ("app-07", "db-01"), ("app-08", "db-02"), ("app-09", "vault-01"), ("app-10", "backup-01"),
         ("db-01", "backup-01"), ("db-02", "backup-01"),
         ("dc-01", "dc-02"), ("dc-01", "exchange-01"),
         ("dc-01", "ws-01"), ("dc-01", "ws-02"), ("dc-01", "ws-03"),
