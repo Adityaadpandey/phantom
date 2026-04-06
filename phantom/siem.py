@@ -1,6 +1,6 @@
 from __future__ import annotations
 import random
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from phantom.network import NetworkState
 from phantom.models import SIEMEvent
 
@@ -86,8 +86,7 @@ class SIEMBus:
 
     def _timestamp(self, turn: int) -> str:
         base = datetime(2026, 1, 1, 8, 0, 0, tzinfo=timezone.utc)
-        minutes = turn * 15
-        ts = base.replace(minute=minutes % 60, hour=8 + minutes // 60)
+        ts = base + timedelta(minutes=turn * 15)
         return ts.strftime("%Y-%m-%dT%H:%M:%SZ")
 
     def _emit_noise(self, turn: int) -> list[SIEMEvent]:
