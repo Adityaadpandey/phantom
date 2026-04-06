@@ -47,7 +47,7 @@ class Observation(BaseModel):
     logs: list[SIEMEvent]
     topology: list[HostView]
     alert_summary: dict[str, int]
-    previous_action_result: str | None
+    previous_action_result: str | None = None
     task_id: str
     task_description: str
 

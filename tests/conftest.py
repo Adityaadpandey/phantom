@@ -1,6 +1,5 @@
 import random
 import pytest
-from phantom.network import NetworkState
 
 @pytest.fixture
 def rng():
@@ -8,4 +7,5 @@ def rng():
 
 @pytest.fixture
 def small_network(rng):
+    from phantom.network import NetworkState
     return NetworkState.from_preset("small_corp", rng)
