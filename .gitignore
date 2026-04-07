@@ -1,11 +1,49 @@
+# Secrets & env
 .env
+.env.local
+.env.*.local
+
+# Python
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
 *.egg-info/
 dist/
 build/
+*.egg
+.eggs/
+
+# Virtual envs
 .venv/
 venv/
+env/
+
+# Testing & coverage
 .pytest_cache/
 .hypothesis/
+.coverage
+htmlcov/
+coverage.xml
+
+# IDE & tools
+.claude/
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Local dev files
+agent.py
+__init__.py
+client.py
+models.py
+validate-submission.sh

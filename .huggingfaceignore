@@ -1,0 +1,43 @@
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.eggs/
+
+# Dev/local files
+.env
+.env.local
+.claude/
+.vscode/
+.idea/
+agent.py
+client.py
+models.py
+validate-submission.sh
+__init__.py
+
+# Testing
+.pytest_cache/
+.hypothesis/
+.coverage
+htmlcov/
+coverage.xml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Build
+dist/
+build/

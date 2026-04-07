@@ -86,16 +86,18 @@ class TaskGrader:
                 h = self.network.hosts[host_id]
                 if h.is_compromised and h.is_isolated:
                     score += 0.5
-                if h.is_crown_jewel and h.is_isolated:
-                    score += 1.0
+                    # Extra bonus for containing a compromised crown jewel
+                    if h.is_crown_jewel:
+                        score += 1.0
         elif action.action_type == ActionType.PATCH_HOST:
             host_id = action.host_id
             if host_id and host_id in self.network.hosts:
                 h = self.network.hosts[host_id]
                 if h.is_patched:  # is_compromised is False after patch; is_patched signals it was cleaned
                     score += 0.5
-                if h.is_crown_jewel and h.is_patched:
-                    score += 1.0
+                    # Extra bonus for cleaning a crown jewel
+                    if h.is_crown_jewel:
+                        score += 1.0
         # Penalty for each newly compromised host this turn
         score -= 0.3 * len(newly_compromised)
         # Extra penalty for crown jewel breach

@@ -1,8 +1,8 @@
 from __future__ import annotations
 import asyncio
-import os
 from typing import Callable
 from openai import AsyncOpenAI
+from phantom.config import API_KEY, API_BASE_URL, MODEL_NAME, FALLBACK_MODEL
 
 
 class CircuitBreakerOpen(Exception):
@@ -29,13 +29,13 @@ class CircuitBreaker:
 
 
 class GPTClient:
-    def __init__(self, primary_model: str, fallback_model: str):
+    def __init__(self, primary_model: str = MODEL_NAME, fallback_model: str = FALLBACK_MODEL):
         self.primary_model = primary_model
         self.fallback_model = fallback_model
-        # Use a sentinel key when none is set so the client can be constructed
-        # without a real API key in test environments (tests mock _openai.chat).
-        api_key = os.environ.get("OPENAI_API_KEY") or "sk-phantom-no-key"
-        self._openai = AsyncOpenAI(api_key=api_key)
+        self._openai = AsyncOpenAI(
+            api_key=API_KEY or "sk-phantom-no-key",
+            base_url=API_BASE_URL,
+        )
         self._circuit_breaker = CircuitBreaker()
 
     async def generate(

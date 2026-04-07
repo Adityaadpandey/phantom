@@ -5,7 +5,11 @@ from phantom.env import PhantomEnv
 from phantom.models import Action, Observation, Reward
 from phantom.task_grader import _TASK_CONFIGS
 
-app = FastAPI(title="PHANTOM", description="Adversarial Cognitive Security Environment")
+app = FastAPI(
+    title="PHANTOM",
+    description="Adversarial Cognitive Security Environment",
+    version="1.0.0",
+)
 
 # In-memory session store (one env per task_id for simplicity)
 _sessions: dict[str, PhantomEnv] = {}
@@ -24,10 +28,49 @@ class StepResponse(BaseModel):
     reward: Reward
 
 
+# ── OpenEnv standard endpoints ───────────────────────────────────────────────
+
 @app.get("/health")
 async def health():
-    return {"status": "ok", "tasks": list(_TASK_CONFIGS.keys())}
+    return {"status": "healthy", "tasks": list(_TASK_CONFIGS.keys())}
 
+
+@app.get("/metadata")
+async def metadata():
+    return {
+        "name": "phantom",
+        "description": (
+            "PHANTOM — Adversarial Cognitive Security Environment. "
+            "AI agents must perform cybersecurity incident response while "
+            "resisting adversarial SIEM log injections."
+        ),
+        "version": "1.0.0",
+        "author": "adityaadpandey",
+        "tasks": list(_TASK_CONFIGS.keys()),
+    }
+
+
+@app.get("/schema")
+async def schema():
+    return {
+        "action": Action.model_json_schema(),
+        "observation": Observation.model_json_schema(),
+        "state": {
+            "type": "object",
+            "properties": {
+                "turn": {"type": "integer"},
+                "max_turns": {"type": "integer"},
+                "task_id": {"type": "string"},
+                "compromised_hosts": {"type": "array", "items": {"type": "string"}},
+                "exfiltration_complete": {"type": "boolean"},
+                "all_contained": {"type": "boolean"},
+                "flagged_logs": {"type": "array", "items": {"type": "string"}},
+            },
+        },
+    }
+
+
+# ── Environment API ──────────────────────────────────────────────────────────
 
 @app.post("/reset/{task_id}", response_model=Observation)
 async def reset(task_id: str, request: ResetRequest):

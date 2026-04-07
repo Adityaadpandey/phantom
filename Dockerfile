@@ -2,7 +2,8 @@
 FROM python:3.12-slim-bookworm AS builder
 WORKDIR /app
 COPY pyproject.toml .
-RUN pip install --no-cache-dir build && pip install --no-cache-dir -e .
+COPY phantom/ phantom/
+RUN pip install --no-cache-dir .
 
 # Stage 2: production image
 FROM python:3.12-slim-bookworm
@@ -10,7 +11,11 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin/uvicorn /usr/local/bin/uvicorn
 COPY phantom/ phantom/
+COPY server/ server/
 COPY config/ config/
+COPY inference.py .
+COPY openenv.yaml .
+COPY README.md .
 
 ENV PHANTOM_ENV=production
 EXPOSE 7860
