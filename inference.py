@@ -52,13 +52,9 @@ def log_start(task: str, env: str, model: str) -> None:
     print(f"[START] task={task} env={env} model={model}", flush=True)
 
 
-def _norm(r: float) -> float:
-    return round(min(max((r + 3.0) / 6.0, 0.0), 1.0), 2)
-
-
 def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
     print(
-        f"[STEP] step={step} action={action} reward={_norm(reward):.2f}"
+        f"[STEP] step={step} action={action} reward={reward:.2f}"
         f" done={'true' if done else 'false'} error={error or 'null'}",
         flush=True,
     )
@@ -67,7 +63,7 @@ def log_step(step: int, action: str, reward: float, done: bool, error: Optional[
 def log_end(success: bool, steps: int, score: float, rewards: list[float]) -> None:
     print(
         f"[END] success={'true' if success else 'false'} steps={steps}"
-        f" score={score:.2f} rewards={','.join(f'{_norm(r):.2f}' for r in rewards)}",
+        f" score={score:.2f} rewards={','.join(f'{r:.2f}' for r in rewards)}",
         flush=True,
     )
 

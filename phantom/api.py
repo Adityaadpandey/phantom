@@ -72,14 +72,44 @@ async def schema():
 
 # ── Environment API ──────────────────────────────────────────────────────────
 
-@app.post("/reset/{task_id}", response_model=Observation)
-async def reset(task_id: str, request: ResetRequest):
+_DEFAULT_TASK = "task_containment"
+
+
+async def _do_reset(task_id: str, seed: int) -> Observation:
     if task_id not in _TASK_CONFIGS:
         raise HTTPException(status_code=422, detail=f"Unknown task_id: {task_id!r}")
-    env = PhantomEnv(task_id, seed=request.seed)
+    env = PhantomEnv(task_id, seed=seed)
     _sessions[task_id] = env
-    obs = env.reset()
-    return obs
+    return await env.areset()
+
+
+# Root endpoints (no task_id) — used by the OpenEnv validator
+@app.post("/reset", response_model=Observation)
+async def reset_default(request: ResetRequest = ResetRequest()):
+    return await _do_reset(_DEFAULT_TASK, request.seed)
+
+
+@app.post("/step", response_model=StepResponse)
+async def step_default(request: StepRequest):
+    env = _sessions.get(_DEFAULT_TASK)
+    if env is None:
+        raise HTTPException(status_code=400, detail="No active session. Call /reset first.")
+    obs, reward = env.step(request.action)
+    return StepResponse(observation=obs, reward=reward)
+
+
+@app.get("/state")
+async def state_default():
+    env = _sessions.get(_DEFAULT_TASK)
+    if env is None:
+        raise HTTPException(status_code=400, detail="No active session. Call /reset first.")
+    return env.state()
+
+
+# Per-task endpoints (task_id in path)
+@app.post("/reset/{task_id}", response_model=Observation)
+async def reset(task_id: str, request: ResetRequest = ResetRequest()):
+    return await _do_reset(task_id, request.seed)
 
 
 @app.post("/step/{task_id}", response_model=StepResponse)

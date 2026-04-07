@@ -1,4 +1,5 @@
 from __future__ import annotations
+import asyncio
 import random
 from phantom.models import (
     Action, ActionType, Observation, Reward, HostStatus, HostView, SIEMEvent
@@ -12,6 +13,15 @@ _PRESET_FOR_TASK = {
     "task_containment": "small_corp",
     "task_adaptive": "mid_corp",
     "task_cognitive_warfare": "enterprise",
+}
+
+# Dynamic topology domain selection — deterministic by seed
+_DOMAINS = ["financial_services", "healthcare", "manufacturing", "tech_startup"]
+
+_SIZE_FOR_TASK = {
+    "task_containment": "small",
+    "task_adaptive": "medium",
+    "task_cognitive_warfare": "large",
 }
 
 
@@ -30,49 +40,86 @@ class PhantomEnv:
         self._flagged_logs: set[str] = set()
         self._last_emitted: list[SIEMEvent] = []
         self._all_emitted: list[SIEMEvent] = []
-        # These are initialised in reset()
+        # LLM injection cache (populated by areset() for task_cognitive_warfare)
+        self._injection_cache: list[SIEMEvent] = []
+        # Initialised in reset()
         self._rng: random.Random = random.Random(seed)
         self._network: NetworkState = None  # type: ignore
         self._attack: AttackEngine = None   # type: ignore
         self._siem: SIEMBus = None          # type: ignore
         self._grader: TaskGrader = None     # type: ignore
 
+    # ── Sync reset (used by inference.py and tests) ───────────────────────────
+
     def reset(self) -> Observation:
-        self._rng = random.Random(self.seed)
+        """Synchronous reset using static network presets."""
+        self._injection_cache = []
         self._network = NetworkState.from_preset(self._preset, random.Random(self.seed))
-        self._attack = AttackEngine(self._network, rng=random.Random(self.seed + 1),
-                                    speed="normal")
-        self._siem = SIEMBus(self._network, rng=random.Random(self.seed + 2),
-                              injection_rate=self._injection_rate)
-        self._grader = TaskGrader(self.task_id, self._network)
-        self._flagged_logs = set()
-        self._last_emitted = []
-        self._all_emitted = []
-        self._turn = 0
+        return self._init_episode()
 
-        # Initial compromise
-        self._attack.initialize()
+    # ── Async reset (used by the API layer) ───────────────────────────────────
 
-        # Emit first batch of logs
-        logs = self._siem.emit(turn=0, newly_compromised=list(self._network.compromised_hosts()))
-        self._last_emitted = logs
-        self._all_emitted = list(logs)
+    async def areset(self) -> Observation:
+        """Async reset with dynamic topology and LLM injection cache (when API key present).
 
-        return self._build_observation(previous_action_result=None, logs=logs)
+        Falls back gracefully to static presets if API is unavailable.
+        """
+        from phantom.config import API_KEY
+
+        self._injection_cache = []
+
+        # ── Dynamic network topology ──────────────────────────────────────────
+        if API_KEY:
+            try:
+                from phantom.gpt_client import GPTClient
+                from phantom.dynamic_topology import DynamicTopologyGenerator
+                domain = _DOMAINS[self.seed % len(_DOMAINS)]
+                size = _SIZE_FOR_TASK[self.task_id]
+                client = GPTClient()
+                gen = DynamicTopologyGenerator(client)
+                self._network = await asyncio.wait_for(
+                    gen.generate(domain, size, self.seed),
+                    timeout=20.0,
+                )
+            except Exception:
+                self._network = NetworkState.from_preset(self._preset, random.Random(self.seed))
+        else:
+            self._network = NetworkState.from_preset(self._preset, random.Random(self.seed))
+
+        obs = self._init_episode()
+
+        # ── LLM injection cache (hard task only) ──────────────────────────────
+        if API_KEY and self.task_id == "task_cognitive_warfare":
+            try:
+                from phantom.gpt_client import GPTClient
+                from phantom.gpt_injection import GPTInjectionEngine
+                client = GPTClient()
+                engine = GPTInjectionEngine(client, self._network)
+                self._injection_cache = await asyncio.wait_for(
+                    engine.generate_cache(n=15),
+                    timeout=45.0,
+                )
+            except Exception:
+                self._injection_cache = []
+
+        return obs
+
+    # ── Step ──────────────────────────────────────────────────────────────────
 
     def step(self, action: Action) -> tuple[Observation, Reward]:
         self._turn += 1
 
-        # Handle the action
         result = self._execute_action(action)
 
-        # World advances: attacker spreads, new logs emitted
         newly_compromised = self._attack.step(self._turn)
-        logs = self._siem.emit(turn=self._turn, newly_compromised=newly_compromised)
+        logs = self._siem.emit(
+            turn=self._turn,
+            newly_compromised=newly_compromised,
+            injection_cache=self._injection_cache if self._injection_cache else None,
+        )
         self._last_emitted = logs
         self._all_emitted.extend(logs)
 
-        # Grade
         reward = self._grader.grade(
             action=action,
             turn=self._turn,
@@ -86,6 +133,10 @@ class PhantomEnv:
         obs = self._build_observation(previous_action_result=result, logs=logs)
         return obs, reward
 
+    async def close(self) -> None:
+        """No-op teardown — satisfies OpenEnv harness close() contract."""
+        pass
+
     def state(self) -> dict:
         """Export current ground-truth state for debugging/analysis."""
         return {
@@ -96,9 +147,34 @@ class PhantomEnv:
             "exfiltration_complete": self._network.exfiltration_complete(),
             "all_contained": self._network.all_contained(),
             "flagged_logs": list(self._flagged_logs),
+            "injection_cache_remaining": len(self._injection_cache),
         }
 
     # ── Private helpers ───────────────────────────────────────────────────────
+
+    def _init_episode(self) -> Observation:
+        """Shared episode initialisation (after network is set)."""
+        self._rng = random.Random(self.seed)
+        self._attack = AttackEngine(self._network, rng=random.Random(self.seed + 1), speed="normal")
+        self._siem = SIEMBus(
+            self._network,
+            rng=random.Random(self.seed + 2),
+            injection_rate=self._injection_rate,
+            max_turns=self._max_turns,
+        )
+        self._grader = TaskGrader(self.task_id, self._network)
+        self._flagged_logs = set()
+        self._last_emitted = []
+        self._all_emitted = []
+        self._turn = 0
+
+        self._attack.initialize()
+
+        logs = self._siem.emit(turn=0, newly_compromised=list(self._network.compromised_hosts()))
+        self._last_emitted = logs
+        self._all_emitted = list(logs)
+
+        return self._build_observation(previous_action_result=None, logs=logs)
 
     def _execute_action(self, action: Action) -> str:
         t = action.action_type
@@ -157,7 +233,6 @@ class PhantomEnv:
     def _build_observation(
         self, previous_action_result: str | None, logs: list[SIEMEvent]
     ) -> Observation:
-        # Strip injection ground truth before exposing to agent
         agent_logs = [
             SIEMEvent(
                 log_id=e.log_id,
@@ -190,7 +265,6 @@ class PhantomEnv:
         )
 
     def _host_view(self, host) -> HostView:
-        """Build agent-visible host view. Only reveal compromise if scanned."""
         if host.last_scanned_turn is not None:
             if host.is_isolated:
                 status = HostStatus.ISOLATED
@@ -201,7 +275,7 @@ class PhantomEnv:
             else:
                 status = HostStatus.CLEAN
         else:
-            status = HostStatus.CLEAN  # unknown until scanned
+            status = HostStatus.CLEAN
 
         return HostView(
             host_id=host.host_id,

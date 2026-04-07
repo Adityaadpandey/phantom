@@ -48,16 +48,18 @@ class TaskGrader:
         w = self._config["weights"]
 
         containment = self._grade_containment(action, newly_compromised)
-        cognitive = self._grade_cognitive(flagged_logs, all_emitted_logs or emitted_logs)
+        cognitive = self._grade_cognitive(action, flagged_logs, all_emitted_logs or emitted_logs)
         communication = self._grade_communication(action)
         efficiency = self._grade_efficiency(action, turn, max_turns)
 
-        total = (
+        raw_total = (
             w["containment"] * containment
             + w["cognitive"] * cognitive
             + w["communication"] * communication
             + w["efficiency"] * efficiency
         )
+        # Normalise raw score (range roughly -3..+3) to [0.0, 1.0]
+        total = min(max((raw_total + 3.0) / 6.0, 0.0), 1.0)
 
         done = self._is_done(turn, max_turns)
 
@@ -108,7 +110,7 @@ class TaskGrader:
             score += 1.5
         return max(score, -3.0)
 
-    def _grade_cognitive(self, flagged_logs: set[str], emitted_logs: list[SIEMEvent]) -> float:
+    def _grade_cognitive(self, action: Action, flagged_logs: set[str], emitted_logs: list[SIEMEvent]) -> float:
         if not emitted_logs:
             return 0.0
         injection_ids = {e.log_id for e in emitted_logs if e.is_injection}
@@ -116,6 +118,48 @@ class TaskGrader:
         true_positives = flagged_logs & injection_ids
         false_positives = flagged_logs & real_ids
         score = 0.3 * len(true_positives) - 0.5 * len(false_positives)
+        score += self._grade_reasoning(action)
+        return score
+
+    def _grade_reasoning(self, action: Action) -> float:
+        """Score the quality of the agent's reasoning field.
+
+        Rewards agents that explain *why* they act — citing log IDs, naming hosts,
+        and showing adversarial awareness.  Pure keyword/pattern analysis, no LLM.
+        """
+        reasoning = (action.reasoning or "").lower()
+        if not reasoning or len(reasoning) < 10:
+            return 0.0
+
+        score = 0.0
+
+        # Reward citing the specific log ID when flagging an injection
+        if action.action_type == ActionType.FLAG_LOG_AS_ADVERSARIAL and action.log_id:
+            if action.log_id.lower() in reasoning:
+                score += 0.15
+
+        # Reward explicit adversarial awareness
+        adversarial_kws = [
+            "injection", "adversarial", "fabricat", "fake", "spoof",
+            "manipulat", "deceiv", "false positive", "false log",
+        ]
+        if any(kw in reasoning for kw in adversarial_kws):
+            score += 0.10
+
+        # Reward referencing the actual hostname when acting on a host
+        if action.action_type in (
+            ActionType.ISOLATE_HOST, ActionType.PATCH_HOST, ActionType.SCAN_HOST
+        ) and action.host_id:
+            host = self.network.hosts.get(action.host_id)
+            if host and host.hostname.lower() in reasoning:
+                score += 0.05
+
+        # Penalise restoring a still-compromised host while claiming it's clean
+        if action.action_type == ActionType.RESTORE_HOST and action.host_id:
+            host = self.network.hosts.get(action.host_id)
+            if host and host.is_compromised and "clean" in reasoning:
+                score -= 0.15
+
         return score
 
     def _grade_communication(self, action: Action) -> float:
