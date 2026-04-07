@@ -32,9 +32,13 @@ from phantom.task_grader import _TASK_CONFIGS
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
-API_KEY      = os.getenv("HF_TOKEN") or os.getenv("API_KEY", "")
-API_BASE_URL = os.getenv("API_BASE_URL") or "https://api.openai.com/v1"
-MODEL_NAME   = os.getenv("MODEL_NAME")  or "gpt-5.4"
+API_BASE_URL = os.getenv("API_BASE_URL", "https://api.openai.com/v1")
+MODEL_NAME   = os.getenv("MODEL_NAME", "gpt-5.4")
+HF_TOKEN     = os.getenv("HF_TOKEN")
+
+if HF_TOKEN is None:
+    raise ValueError("HF_TOKEN environment variable is required")
+
 BENCHMARK    = "phantom"
 TEMPERATURE  = 0.2
 # Per-task success thresholds — harder tasks have larger networks so scoring is lower
@@ -60,10 +64,10 @@ def log_step(step: int, action: str, reward: float, done: bool, error: Optional[
     )
 
 
-def log_end(success: bool, steps: int, score: float, rewards: list[float]) -> None:
+def log_end(success: bool, steps: int, rewards: list[float]) -> None:
     print(
         f"[END] success={'true' if success else 'false'} steps={steps}"
-        f" score={score:.2f} rewards={','.join(f'{r:.2f}' for r in rewards)}",
+        f" rewards={','.join(f'{r:.2f}' for r in rewards)}",
         flush=True,
     )
 
@@ -189,72 +193,84 @@ def _action_str(action: Action) -> str:
 def run_episode(task_id: str, client: OpenAI) -> None:
     log_start(task_id, BENCHMARK, MODEL_NAME)
 
-    env = PhantomEnv(task_id, seed=0)
-    obs = env.reset()
-    max_steps = _TASK_CONFIGS[task_id]["max_turns"]
-
-    system_msg = [{"role": "system", "content": _SYSTEM_PROMPT}]
-    history: list[dict] = []
     rewards: list[float] = []
     step = 0
-    done = False
+    success = False
 
-    while step < max_steps and not done:
-        user_msg = {"role": "user", "content": _format_obs(obs)}
-        pruned = history[-(HISTORY_TURNS * 2):]
-        messages = system_msg + pruned + [user_msg]
+    try:
+        env = PhantomEnv(task_id, seed=0)
+        obs = env.reset()
+        max_steps = _TASK_CONFIGS[task_id]["max_turns"]
 
-        last_error: Optional[str] = None
-        assistant_text = ""
+        system_msg = [{"role": "system", "content": _SYSTEM_PROMPT}]
+        history: list[dict] = []
+        done = False
 
-        try:
-            resp = client.chat.completions.create(
-                model=MODEL_NAME,
-                messages=messages,
-                temperature=TEMPERATURE,
-            )
-            assistant_text = resp.choices[0].message.content or ""
-            actions = _parse_actions(assistant_text)
-        except Exception as exc:
-            last_error = str(exc)[:120]
-            actions = [Action(action_type=ActionType.DO_NOTHING, reasoning="llm error")]
+        while step < max_steps and not done:
+            user_msg = {"role": "user", "content": _format_obs(obs)}
+            pruned = history[-(HISTORY_TURNS * 2):]
+            messages = system_msg + pruned + [user_msg]
 
-        history.append(user_msg)
-        history.append({"role": "assistant", "content": assistant_text})
+            last_error: Optional[str] = None
+            assistant_text = ""
 
-        for action in actions:
-            # Auto-fill incident_report when model forgets the field
-            if (action.action_type == ActionType.SUBMIT_INCIDENT_REPORT
-                    and not action.incident_report):
-                state_snap = env.state()
-                action = action.model_copy(update={"incident_report": (
-                    f"Incident report for {task_id}. "
-                    f"Turn {step}/{max_steps}. "
-                    f"Compromised hosts contained: {state_snap.get('compromised_hosts', [])}. "
-                    f"Exfiltration occurred: {state_snap.get('exfiltration_complete', False)}. "
-                    f"All contained: {state_snap.get('all_contained', False)}. "
-                    f"Crown jewels were prioritised. Adversarial SIEM injections were flagged. "
-                    f"Attacker used lateral movement. Isolation and patching applied."
-                )})
+            try:
+                resp = client.chat.completions.create(
+                    model=MODEL_NAME,
+                    messages=messages,
+                    temperature=TEMPERATURE,
+                )
+                assistant_text = resp.choices[0].message.content or ""
+                actions = _parse_actions(assistant_text)
+            except Exception as exc:
+                last_error = str(exc)[:120]
+                actions = [Action(action_type=ActionType.DO_NOTHING, reasoning="llm error")]
 
-            step += 1
-            obs, reward = env.step(action)
-            done = reward.episode_done
-            rewards.append(reward.total)
-            log_step(step, _action_str(action), reward.total, done, last_error)
-            last_error = None
-            if done or step >= max_steps:
-                break
+            history.append(user_msg)
+            history.append({"role": "assistant", "content": assistant_text})
 
-    score   = compute_score(env.state())
-    success = score >= _SUCCESS_THRESHOLDS.get(task_id, 0.4)
-    log_end(success=success, steps=step, score=score, rewards=rewards)
+            for action in actions:
+                # Auto-fill incident_report when model forgets the field
+                if (action.action_type == ActionType.SUBMIT_INCIDENT_REPORT
+                        and not action.incident_report):
+                    state_snap = env.state()
+                    action = action.model_copy(update={"incident_report": (
+                        f"Incident report for {task_id}. "
+                        f"Turn {step}/{max_steps}. "
+                        f"Compromised hosts contained: {state_snap.get('compromised_hosts', [])}. "
+                        f"Exfiltration occurred: {state_snap.get('exfiltration_complete', False)}. "
+                        f"All contained: {state_snap.get('all_contained', False)}. "
+                        f"Crown jewels were prioritised. Adversarial SIEM injections were flagged. "
+                        f"Attacker used lateral movement. Isolation and patching applied."
+                    )})
+
+                step += 1
+                obs, reward = env.step(action)
+                done = reward.episode_done
+                rewards.append(reward.total)
+                log_step(step, _action_str(action), reward.total, done, last_error)
+                last_error = None
+                if done or step >= max_steps:
+                    break
+
+        score   = compute_score(env.state())
+        success = score >= _SUCCESS_THRESHOLDS.get(task_id, 0.4)
+
+    except Exception as exc:
+        # Ensure [END] is always emitted even on fatal errors
+        print(f"[STEP] step={step + 1} action=do_nothing() reward=0.00"
+              f" done=true error={str(exc)[:120]}", flush=True)
+        rewards.append(0.0)
+        step += 1
+
+    finally:
+        log_end(success=success, steps=step, rewards=rewards)
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
 
 def main() -> None:
-    client = OpenAI(api_key=API_KEY, base_url=API_BASE_URL)
+    client = OpenAI(api_key=HF_TOKEN, base_url=API_BASE_URL)
     for task_id in TASKS:
         run_episode(task_id, client)
 
