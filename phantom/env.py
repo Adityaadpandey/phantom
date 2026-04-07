@@ -29,6 +29,7 @@ class PhantomEnv:
         self._preset = _PRESET_FOR_TASK[task_id]
         self._flagged_logs: set[str] = set()
         self._last_emitted: list[SIEMEvent] = []
+        self._all_emitted: list[SIEMEvent] = []
         # These are initialised in reset()
         self._rng: random.Random = random.Random(seed)
         self._network: NetworkState = None  # type: ignore
@@ -46,6 +47,7 @@ class PhantomEnv:
         self._grader = TaskGrader(self.task_id, self._network)
         self._flagged_logs = set()
         self._last_emitted = []
+        self._all_emitted = []
         self._turn = 0
 
         # Initial compromise
@@ -54,6 +56,7 @@ class PhantomEnv:
         # Emit first batch of logs
         logs = self._siem.emit(turn=0, newly_compromised=list(self._network.compromised_hosts()))
         self._last_emitted = logs
+        self._all_emitted = list(logs)
 
         return self._build_observation(previous_action_result=None, logs=logs)
 
@@ -67,6 +70,7 @@ class PhantomEnv:
         newly_compromised = self._attack.step(self._turn)
         logs = self._siem.emit(turn=self._turn, newly_compromised=newly_compromised)
         self._last_emitted = logs
+        self._all_emitted.extend(logs)
 
         # Grade
         reward = self._grader.grade(
@@ -75,6 +79,7 @@ class PhantomEnv:
             max_turns=self._max_turns,
             flagged_logs=self._flagged_logs,
             emitted_logs=logs,
+            all_emitted_logs=self._all_emitted,
             newly_compromised=newly_compromised,
         )
 
@@ -205,4 +210,5 @@ class PhantomEnv:
             services=host.services,
             status=status,
             last_scanned=host.last_scanned_turn,
+            is_crown_jewel=host.is_crown_jewel,
         )

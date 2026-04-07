@@ -38,6 +38,7 @@ class HostView(BaseModel):
     services: list[str]
     status: HostStatus
     last_scanned: int | None
+    is_crown_jewel: bool = False
 
 
 class Observation(BaseModel):

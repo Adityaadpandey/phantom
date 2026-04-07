@@ -43,11 +43,12 @@ class TaskGrader:
         flagged_logs: set[str],
         emitted_logs: list[SIEMEvent],
         newly_compromised: list[str],
+        all_emitted_logs: list[SIEMEvent] | None = None,
     ) -> Reward:
         w = self._config["weights"]
 
         containment = self._grade_containment(action, newly_compromised)
-        cognitive = self._grade_cognitive(flagged_logs, emitted_logs)
+        cognitive = self._grade_cognitive(flagged_logs, all_emitted_logs or emitted_logs)
         communication = self._grade_communication(action)
         efficiency = self._grade_efficiency(action, turn, max_turns)
 
@@ -78,13 +79,22 @@ class TaskGrader:
     def _grade_containment(self, action: Action, newly_compromised: list[str]) -> float:
         score = 0.0
         # Reward for containing (isolating/patching compromised hosts)
-        if action.action_type in (ActionType.ISOLATE_HOST, ActionType.PATCH_HOST):
+        # Note: after isolate_host(), is_compromised stays True; after patch_host(), is_compromised is cleared
+        if action.action_type == ActionType.ISOLATE_HOST:
             host_id = action.host_id
             if host_id and host_id in self.network.hosts:
                 h = self.network.hosts[host_id]
-                if h.is_compromised:
+                if h.is_compromised and h.is_isolated:
                     score += 0.5
-                if h.is_crown_jewel and (h.is_isolated or h.is_patched):
+                if h.is_crown_jewel and h.is_isolated:
+                    score += 1.0
+        elif action.action_type == ActionType.PATCH_HOST:
+            host_id = action.host_id
+            if host_id and host_id in self.network.hosts:
+                h = self.network.hosts[host_id]
+                if h.is_patched:  # is_compromised is False after patch; is_patched signals it was cleaned
+                    score += 0.5
+                if h.is_crown_jewel and h.is_patched:
                     score += 1.0
         # Penalty for each newly compromised host this turn
         score -= 0.3 * len(newly_compromised)
