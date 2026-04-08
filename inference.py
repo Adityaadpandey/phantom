@@ -58,16 +58,16 @@ def log_start(task: str, env: str, model: str) -> None:
 
 def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
     print(
-        f"[STEP] step={step} action={action} reward={reward:.1f}"
+        f"[STEP] step={step} action={action} reward={reward:.2f}"
         f" done={'true' if done else 'false'} error={error or 'null'}",
         flush=True,
     )
 
 
-def log_end(success: bool, steps: int, rewards: list[float]) -> None:
+def log_end(success: bool, steps: int, score: float, rewards: list[float]) -> None:
     print(
         f"[END] success={'true' if success else 'false'} steps={steps}"
-        f" rewards={','.join(f'{r:.1f}' for r in rewards)}",
+        f" score={score:.2f} rewards={','.join(f'{r:.2f}' for r in rewards)}",
         flush=True,
     )
 
@@ -81,7 +81,8 @@ def compute_score(state: dict) -> float:
     containment   = 1.0 if all_contained else max(0.0, 1.0 - n_compromised * 0.2)
     protection    = 0.0 if exfil else 1.0
     raw = 0.6 * containment + 0.4 * protection
-    return round(min(max(raw, 1e-4), 1.0 - 1e-4), 4)
+    # Clamp strictly within (0, 1) — values must not round to 0.00 or 1.00
+    return round(min(max(raw, 0.01), 0.99), 2)
 
 
 # ── Prompt ────────────────────────────────────────────────────────────────────
@@ -197,6 +198,7 @@ def run_episode(task_id: str, client: OpenAI) -> None:
     rewards: list[float] = []
     step = 0
     success = False
+    score = 0.01  # default if episode fails before compute_score
 
     try:
         env = PhantomEnv(task_id, seed=0)
@@ -259,13 +261,13 @@ def run_episode(task_id: str, client: OpenAI) -> None:
 
     except Exception as exc:
         # Ensure [END] is always emitted even on fatal errors
-        print(f"[STEP] step={step + 1} action=do_nothing() reward=0.0"
+        print(f"[STEP] step={step + 1} action=do_nothing() reward=0.01"
               f" done=true error={str(exc)[:120]}", flush=True)
-        rewards.append(0.0)
+        rewards.append(0.01)
         step += 1
 
     finally:
-        log_end(success=success, steps=step, rewards=rewards)
+        log_end(success=success, steps=step, score=score, rewards=rewards)
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
