@@ -9,7 +9,7 @@ Environment variables:
 
 STDOUT FORMAT (strict):
     [START] task=<task_name> env=phantom model=<model_name>
-    [STEP]  step=<n> action=<action_str> reward=<0.00> done=<true|false> error=<msg|null>
+    [STEP]  step=<n> action=<action_str> reward=<0.0> done=<true|false> error=<msg|null>
     [END]   success=<true|false> steps=<n> score=<score> rewards=<r1,r2,...>
 """
 
@@ -58,7 +58,7 @@ def log_start(task: str, env: str, model: str) -> None:
 
 def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
     print(
-        f"[STEP] step={step} action={action} reward={reward:.2f}"
+        f"[STEP] step={step} action={action} reward={reward:.1f}"
         f" done={'true' if done else 'false'} error={error or 'null'}",
         flush=True,
     )
@@ -67,7 +67,7 @@ def log_step(step: int, action: str, reward: float, done: bool, error: Optional[
 def log_end(success: bool, steps: int, rewards: list[float]) -> None:
     print(
         f"[END] success={'true' if success else 'false'} steps={steps}"
-        f" rewards={','.join(f'{r:.2f}' for r in rewards)}",
+        f" rewards={','.join(f'{r:.1f}' for r in rewards)}",
         flush=True,
     )
 
@@ -258,7 +258,7 @@ def run_episode(task_id: str, client: OpenAI) -> None:
 
     except Exception as exc:
         # Ensure [END] is always emitted even on fatal errors
-        print(f"[STEP] step={step + 1} action=do_nothing() reward=0.00"
+        print(f"[STEP] step={step + 1} action=do_nothing() reward=0.0"
               f" done=true error={str(exc)[:120]}", flush=True)
         rewards.append(0.0)
         step += 1
