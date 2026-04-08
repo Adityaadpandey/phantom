@@ -42,7 +42,6 @@ Thumbs.db
 logs/
 
 # Lock files
-uv.lock
 
 # Local dev files
 validate-submission.sh
