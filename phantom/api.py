@@ -25,7 +25,9 @@ class StepRequest(BaseModel):
 
 class StepResponse(BaseModel):
     observation: Observation
-    reward: Reward
+    reward: float
+    done: bool
+    reward_detail: Reward
 
 
 # ── OpenEnv standard endpoints ───────────────────────────────────────────────
@@ -95,7 +97,7 @@ async def step_default(request: StepRequest):
     if env is None:
         raise HTTPException(status_code=400, detail="No active session. Call /reset first.")
     obs, reward = env.step(request.action)
-    return StepResponse(observation=obs, reward=reward)
+    return StepResponse(observation=obs, reward=reward.total, done=reward.episode_done, reward_detail=reward)
 
 
 @app.get("/state")
@@ -118,7 +120,7 @@ async def step(task_id: str, request: StepRequest):
     if env is None:
         raise HTTPException(status_code=400, detail=f"No active session for {task_id!r}. Call /reset first.")
     obs, reward = env.step(request.action)
-    return StepResponse(observation=obs, reward=reward)
+    return StepResponse(observation=obs, reward=reward.total, done=reward.episode_done, reward_detail=reward)
 
 
 @app.get("/state/{task_id}")
