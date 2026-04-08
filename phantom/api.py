@@ -2,7 +2,7 @@ from __future__ import annotations
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from phantom.env import PhantomEnv
-from phantom.models import Action, Observation, Reward
+from phantom.models import Action, Observation
 from phantom.task_grader import _TASK_CONFIGS
 
 app = FastAPI(
@@ -27,7 +27,6 @@ class StepResponse(BaseModel):
     observation: Observation
     reward: float = Field(gt=0.0, lt=1.0)
     done: bool
-    reward_detail: Reward
 
 
 # ── OpenEnv standard endpoints ───────────────────────────────────────────────
@@ -97,7 +96,7 @@ async def step_default(request: StepRequest):
     if env is None:
         raise HTTPException(status_code=400, detail="No active session. Call /reset first.")
     obs, reward = env.step(request.action)
-    return StepResponse(observation=obs, reward=reward.total, done=reward.episode_done, reward_detail=reward)
+    return StepResponse(observation=obs, reward=reward.total, done=reward.episode_done)
 
 
 @app.get("/state")
@@ -120,7 +119,7 @@ async def step(task_id: str, request: StepRequest):
     if env is None:
         raise HTTPException(status_code=400, detail=f"No active session for {task_id!r}. Call /reset first.")
     obs, reward = env.step(request.action)
-    return StepResponse(observation=obs, reward=reward.total, done=reward.episode_done, reward_detail=reward)
+    return StepResponse(observation=obs, reward=reward.total, done=reward.episode_done)
 
 
 @app.get("/state/{task_id}")
