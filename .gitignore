@@ -42,11 +42,11 @@ Thumbs.db
 logs/
 
 # Local dev files
-agent.py
-__init__.py
-client.py
-models.py
-validate-submission.sh
+# agent.py
+# __init__.py
+# client.py
+# models.py
+# validate-submission.sh
 
 
 
