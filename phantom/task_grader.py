@@ -58,8 +58,8 @@ class TaskGrader:
             + w["communication"] * communication
             + w["efficiency"] * efficiency
         )
-        # Normalise raw score (range roughly -3..+3) to [0.0, 1.0]
-        total = min(max((raw_total + 3.0) / 6.0, 0.0), 1.0)
+        # Normalise raw score (range roughly -3..+3) to (0.0, 1.0) exclusive
+        total = min(max((raw_total + 3.0) / 6.0, 1e-4), 1.0 - 1e-4)
 
         done = self._is_done(turn, max_turns)
 

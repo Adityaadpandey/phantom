@@ -80,7 +80,8 @@ def compute_score(state: dict) -> float:
     n_compromised = len(state.get("compromised_hosts", []))
     containment   = 1.0 if all_contained else max(0.0, 1.0 - n_compromised * 0.2)
     protection    = 0.0 if exfil else 1.0
-    return round(min(max(0.6 * containment + 0.4 * protection, 0.0), 1.0), 2)
+    raw = 0.6 * containment + 0.4 * protection
+    return round(min(max(raw, 1e-4), 1.0 - 1e-4), 4)
 
 
 # ── Prompt ────────────────────────────────────────────────────────────────────
