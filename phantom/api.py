@@ -1,6 +1,6 @@
 from __future__ import annotations
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from phantom.env import PhantomEnv
 from phantom.models import Action, Observation, Reward
 from phantom.task_grader import _TASK_CONFIGS
@@ -25,7 +25,7 @@ class StepRequest(BaseModel):
 
 class StepResponse(BaseModel):
     observation: Observation
-    reward: float
+    reward: float = Field(gt=0.0, lt=1.0)
     done: bool
     reward_detail: Reward
 

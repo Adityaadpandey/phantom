@@ -1,6 +1,6 @@
 from __future__ import annotations
 from enum import Enum
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ActionType(str, Enum):
@@ -64,10 +64,10 @@ class Action(BaseModel):
 
 
 class Reward(BaseModel):
-    total: float
-    containment_score: float
-    cognitive_score: float
-    communication_score: float
-    efficiency_bonus: float
+    total: float = Field(gt=0.0, lt=1.0)
+    containment_score: float = Field(gt=0.0, lt=1.0)
+    cognitive_score: float = Field(gt=0.0, lt=1.0)
+    communication_score: float = Field(gt=0.0, lt=1.0)
+    efficiency_bonus: float = Field(gt=0.0, lt=1.0)
     episode_done: bool
     info: dict
