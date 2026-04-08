@@ -319,7 +319,7 @@ If you use PHANTOM in your research, please cite:
 ```bibtex
 @misc{phantom2026,
   title  = {PHANTOM: Adversarial Cognitive Security Environment for AI Agent Evaluation},
-  author = {Aditya Pandey},
+  author = {Aditya Pandey},{Umyal Dixit},
   year   = {2026},
   url    = {https://huggingface.co/spaces/Adpandey/phantom}
 }
