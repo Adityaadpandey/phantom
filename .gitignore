@@ -48,8 +48,7 @@ client.py
 models.py
 validate-submission.sh
 
-# Lock files
-uv.lock
+
 
 # Claude Code & local tooling
 .claude/
