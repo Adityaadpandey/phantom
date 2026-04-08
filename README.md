@@ -12,7 +12,7 @@ tags:
 
 # 🛡️ PHANTOM — Adversarial Cognitive Security Environment
 
-**An AI drug safety monitoring and pharmacovigilance environment for OpenEnv.**
+**The environment that fights back.**
 
 PHANTOM doesn't just evaluate whether an AI agent can respond to a cyber incident — it actively tries to deceive the agent into making the wrong decisions. A live adversarial campaign plants fabricated SIEM logs using real hostnames, spoofed security tool sources, and phase-escalating psychological manipulation designed to exploit how LLMs process authority and context.
 
