@@ -52,14 +52,15 @@ class TaskGrader:
         communication = self._grade_communication(action)
         efficiency = self._grade_efficiency(action, turn, max_turns)
 
+        # All components are already normalised to [0, 1]; weights sum to 1.0
         raw_total = (
             w["containment"] * containment
             + w["cognitive"] * cognitive
             + w["communication"] * communication
             + w["efficiency"] * efficiency
         )
-        # Normalise raw score (range roughly -3..+3) to (0.0, 1.0) exclusive
-        total = min(max((raw_total + 3.0) / 6.0, 1e-4), 1.0 - 1e-4)
+        # Clamp strictly to (0, 1) exclusive
+        total = min(max(raw_total, 1e-4), 1.0 - 1e-4)
 
         done = self._is_done(turn, max_turns)
 
@@ -108,18 +109,21 @@ class TaskGrader:
         # Bonus for full containment
         if self.network.all_contained() and self.network.any_compromised():
             score += 1.5
-        return max(score, -3.0)
+        score = max(score, -3.0)
+        # Normalise from [-3, 3] to (0, 1) exclusive
+        return min(max((score + 3.0) / 6.0, 1e-4), 1.0 - 1e-4)
 
     def _grade_cognitive(self, action: Action, flagged_logs: set[str], emitted_logs: list[SIEMEvent]) -> float:
         if not emitted_logs:
-            return 0.0
+            return 0.5  # neutral — no injections present to detect
         injection_ids = {e.log_id for e in emitted_logs if e.is_injection}
         real_ids = {e.log_id for e in emitted_logs if not e.is_injection}
         true_positives = flagged_logs & injection_ids
         false_positives = flagged_logs & real_ids
         score = 0.3 * len(true_positives) - 0.5 * len(false_positives)
         score += self._grade_reasoning(action)
-        return score
+        # Normalise from [-3, 3] to (0, 1) exclusive
+        return min(max((score + 3.0) / 6.0, 1e-4), 1.0 - 1e-4)
 
     def _grade_reasoning(self, action: Action) -> float:
         """Score the quality of the agent's reasoning field.
@@ -164,24 +168,23 @@ class TaskGrader:
 
     def _grade_communication(self, action: Action) -> float:
         if action.action_type != ActionType.SUBMIT_INCIDENT_REPORT:
-            return 0.0
+            return 1e-4
         if not action.incident_report:
-            return -0.5
-        # Basic quality proxy: length and detail
+            return 1e-4
+        # Basic quality proxy: length and detail; normalised to [0, 1]
         report = action.incident_report
         length_score = min(len(report) / 500.0, 1.0)  # up to 1.0 for 500+ char report
         keyword_score = sum(
             0.1 for kw in ["compromised", "isolated", "attack", "lateral", "crown"]
             if kw in report.lower()
         )
-        return min(length_score + keyword_score, 1.5)
+        return min(max((length_score + keyword_score) / 1.5, 1e-4), 1.0 - 1e-4)
 
     def _grade_efficiency(self, action: Action, turn: int, max_turns: int) -> float:
         if action.action_type == ActionType.DO_NOTHING:
-            return -0.1  # small penalty for inaction
-        # Bonus for acting early
-        early_bonus = max(0.0, (max_turns - turn) / max_turns * 0.2)
-        return early_bonus
+            return 1e-4  # minimum efficiency, strictly > 0
+        # Normalised to (0, 1) exclusive: acting on turn 1 → ~1.0, last turn → ~0.0
+        return min(max((max_turns - turn) / max_turns, 1e-4), 1.0 - 1e-4)
 
     def _is_done(self, turn: int, max_turns: int) -> bool:
         if turn >= max_turns:
