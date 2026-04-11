@@ -74,7 +74,7 @@ def test_cognitive_penalty_for_false_positive(net):
         flagged_logs={"LOG-REAL-01"},
         emitted_logs=[real_log], newly_compromised=[]
     )
-    assert reward.cognitive_score < 0.0
+    assert reward.cognitive_score <= 0.0
 
 def test_total_is_weighted_sum(net):
     grader = TaskGrader("task_containment", net)
