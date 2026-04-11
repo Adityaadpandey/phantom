@@ -16,6 +16,26 @@ def test_action_scan_requires_no_extra():
     assert a.host_id == "h1"
 
 
+def test_action_validation_requires_host_for_isolate():
+    with pytest.raises(ValidationError):
+        Action(action_type=ActionType.ISOLATE_HOST)
+
+
+def test_action_validation_requires_log_for_flag():
+    with pytest.raises(ValidationError):
+        Action(action_type=ActionType.FLAG_LOG_AS_ADVERSARIAL)
+
+
+def test_action_validation_requires_report_for_submit():
+    with pytest.raises(ValidationError):
+        Action(action_type=ActionType.SUBMIT_INCIDENT_REPORT, incident_report="  ")
+
+
+def test_action_validation_do_nothing_disallows_target_fields():
+    with pytest.raises(ValidationError):
+        Action(action_type=ActionType.DO_NOTHING, host_id="db-01")
+
+
 def test_action_serializes_to_dict():
     a = Action(action_type=ActionType.DO_NOTHING)
     d = a.model_dump()

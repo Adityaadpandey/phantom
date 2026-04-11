@@ -47,6 +47,16 @@ async def test_step_before_reset_returns_400():
         })
     assert resp.status_code == 400
 
+
+@pytest.mark.asyncio
+async def test_step_rejects_invalid_action_payload():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        await client.post("/reset/task_containment", json={"seed": 42})
+        resp = await client.post("/step/task_containment", json={
+            "action": {"action_type": "isolate_host"}
+        })
+    assert resp.status_code == 422
+
 @pytest.mark.asyncio
 async def test_state_endpoint():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:

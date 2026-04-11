@@ -194,20 +194,39 @@ class PhantomEnv:
         if t == ActionType.ISOLATE_HOST:
             if not hid or hid not in self._network.hosts:
                 return f"Isolation failed: unknown host {hid!r}"
+            host = self._network.hosts[hid]
+            if host.last_scanned_turn is None:
+                return f"Isolation failed: host {host.hostname} must be scanned first."
+            if host.is_isolated:
+                return f"Host {host.hostname} is already isolated."
+            if not host.is_compromised:
+                return f"Isolation skipped: host {host.hostname} is not compromised."
             self._network.isolate_host(hid)
-            return f"Host {self._network.hosts[hid].hostname} isolated from network."
+            return f"Host {host.hostname} isolated from network."
 
         if t == ActionType.PATCH_HOST:
             if not hid or hid not in self._network.hosts:
                 return f"Patch failed: unknown host {hid!r}"
+            host = self._network.hosts[hid]
+            if host.last_scanned_turn is None:
+                return f"Patch failed: host {host.hostname} must be scanned first."
+            if not host.is_isolated:
+                return f"Patch failed: host {host.hostname} must be isolated first."
+            if not host.is_compromised:
+                return f"Patch skipped: host {host.hostname} is not compromised."
             self._network.patch_host(hid)
-            return f"Host {self._network.hosts[hid].hostname} patched and cleaned."
+            return f"Host {host.hostname} patched and cleaned."
 
         if t == ActionType.RESTORE_HOST:
             if not hid or hid not in self._network.hosts:
                 return f"Restore failed: unknown host {hid!r}"
+            host = self._network.hosts[hid]
+            if not host.is_isolated:
+                return f"Restore skipped: host {host.hostname} is not isolated."
+            if not host.is_patched:
+                return f"Restore failed: host {host.hostname} must be patched first."
             self._network.restore_host(hid)
-            return f"Host {self._network.hosts[hid].hostname} restored to network."
+            return f"Host {host.hostname} restored to network."
 
         if t == ActionType.BLOCK_TRAFFIC:
             rule = action.traffic_rule or "(no rule specified)"

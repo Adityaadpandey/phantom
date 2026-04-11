@@ -3,6 +3,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from phantom.env import PhantomEnv
 from phantom.models import Action, Observation
+from phantom.session_store import SessionStore
 from phantom.task_grader import _TASK_CONFIGS
 
 app = FastAPI(
@@ -11,8 +12,7 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# In-memory session store (one env per task_id for simplicity)
-_sessions: dict[str, PhantomEnv] = {}
+_sessions = SessionStore()
 
 
 class ResetRequest(BaseModel):
@@ -25,7 +25,7 @@ class StepRequest(BaseModel):
 
 class StepResponse(BaseModel):
     observation: Observation
-    reward: float = Field(gt=0.0, lt=1.0)
+    reward: float = Field(ge=0.0, le=1.0)
     done: bool
 
 
@@ -80,8 +80,15 @@ async def _do_reset(task_id: str, seed: int) -> Observation:
     if task_id not in _TASK_CONFIGS:
         raise HTTPException(status_code=422, detail=f"Unknown task_id: {task_id!r}")
     env = PhantomEnv(task_id, seed=seed)
-    _sessions[task_id] = env
+    await _sessions.set(task_id, env)
     return await env.areset()
+
+
+def _require_active_session(task_id: str) -> PhantomEnv:
+    env = _sessions.get(task_id)
+    if env is None:
+        raise HTTPException(status_code=400, detail=f"No active session for {task_id!r}. Call /reset first.")
+    return env
 
 
 # Root endpoints (no task_id) — used by the OpenEnv validator
@@ -92,18 +99,14 @@ async def reset_default(request: ResetRequest = ResetRequest()):
 
 @app.post("/step", response_model=StepResponse)
 async def step_default(request: StepRequest):
-    env = _sessions.get(_DEFAULT_TASK)
-    if env is None:
-        raise HTTPException(status_code=400, detail="No active session. Call /reset first.")
+    env = _require_active_session(_DEFAULT_TASK)
     obs, reward = env.step(request.action)
     return StepResponse(observation=obs, reward=reward.total, done=reward.episode_done)
 
 
 @app.get("/state")
 async def state_default():
-    env = _sessions.get(_DEFAULT_TASK)
-    if env is None:
-        raise HTTPException(status_code=400, detail="No active session. Call /reset first.")
+    env = _require_active_session(_DEFAULT_TASK)
     return env.state()
 
 
@@ -115,16 +118,12 @@ async def reset(task_id: str, request: ResetRequest = ResetRequest()):
 
 @app.post("/step/{task_id}", response_model=StepResponse)
 async def step(task_id: str, request: StepRequest):
-    env = _sessions.get(task_id)
-    if env is None:
-        raise HTTPException(status_code=400, detail=f"No active session for {task_id!r}. Call /reset first.")
+    env = _require_active_session(task_id)
     obs, reward = env.step(request.action)
     return StepResponse(observation=obs, reward=reward.total, done=reward.episode_done)
 
 
 @app.get("/state/{task_id}")
 async def state(task_id: str):
-    env = _sessions.get(task_id)
-    if env is None:
-        raise HTTPException(status_code=400, detail=f"No active session for {task_id!r}. Call /reset first.")
+    env = _require_active_session(task_id)
     return env.state()

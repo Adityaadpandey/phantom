@@ -41,17 +41,7 @@ Thumbs.db
 *.log
 logs/
 
-# Local dev files
-agent.py
-__init__.py
-client.py
-models.py
-validate-submission.sh
-
-
-
-# Claude Code & local tooling
-.claude/
-
 # Local docs/planning
 docs/
+
+/examples

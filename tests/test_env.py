@@ -60,6 +60,23 @@ def test_scan_reveals_compromise():
     scanned_view = next(h for h in obs.topology if h.host_id == host_id)
     assert scanned_view.status == HostStatus.COMPROMISED
 
+
+def test_isolate_requires_prior_scan():
+    env = PhantomEnv("task_containment", seed=42)
+    env.reset()
+    host_id = env._network.compromised_hosts()[0]
+    obs, _ = env.step(Action(action_type=ActionType.ISOLATE_HOST, host_id=host_id))
+    assert "must be scanned first" in (obs.previous_action_result or "")
+
+
+def test_patch_requires_isolation():
+    env = PhantomEnv("task_containment", seed=42)
+    env.reset()
+    host_id = env._network.compromised_hosts()[0]
+    env.step(Action(action_type=ActionType.SCAN_HOST, host_id=host_id))
+    obs, _ = env.step(Action(action_type=ActionType.PATCH_HOST, host_id=host_id))
+    assert "must be isolated first" in (obs.previous_action_result or "")
+
 def test_episode_ends_at_max_turns():
     env = PhantomEnv("task_containment", seed=42)
     env.reset()

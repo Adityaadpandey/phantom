@@ -197,15 +197,17 @@ curl -X POST http://localhost:7860/step/task_cognitive_warfare \
 
 | Action                    | Required Fields   | Notes                                               |
 | ------------------------- | ----------------- | --------------------------------------------------- |
-| `scan_host`               | `host_id`         | Must scan before isolate/patch                      |
-| `isolate_host`            | `host_id`         | Stops lateral spread from this host                 |
-| `patch_host`              | `host_id`         | Clears compromise; host must be isolated first      |
-| `restore_host`            | `host_id`         | Returns patched host to network                     |
+| `scan_host`               | `host_id`         | Reveals true host status                            |
+| `isolate_host`            | `host_id`         | Requires prior scan and a compromised target host   |
+| `patch_host`              | `host_id`         | Requires prior scan and an isolated compromised host |
+| `restore_host`            | `host_id`         | Requires isolated + patched host                    |
 | `block_traffic`           | `traffic_rule`    | Advisory; logged                                    |
 | `flag_log_as_adversarial` | `log_id`          | Marks a SIEM log as injection                       |
 | `submit_incident_report`  | `incident_report` | Required in final turns of `task_cognitive_warfare` |
 | `query_threat_intel`      | `threat_query`    | Advisory; logged                                    |
-| `do_nothing`              | —                 | Incurs efficiency penalty                           |
+| `do_nothing`              | —                 | Must not include target fields                      |
+
+Invalid action payloads now fail fast with HTTP `422` validation errors.
 
 ---
 
@@ -214,7 +216,7 @@ curl -X POST http://localhost:7860/step/task_cognitive_warfare \
 ### Prerequisites
 
 - Python 3.11+
-- `OPENAI_API_KEY` — optional, enables dynamic topologies and LLM injections in `task_cognitive_warfare`
+- Optional API key (`OPENAI_API_KEY`, `HF_TOKEN`, or `API_KEY`) to enable dynamic topologies and LLM injections in `task_cognitive_warfare`
 
 ### Install
 
@@ -296,8 +298,9 @@ pytest tests/test_siem.py       # injection engine
 
 | Variable         | Default                     | Description                                       |
 | ---------------- | --------------------------- | ------------------------------------------------- |
-| `OPENAI_API_KEY` | —                           | Enables dynamic topologies and LLM injections     |
-| `HF_TOKEN`       | required by `inference.py`  | API key passed as `openai.api_key` in submission  |
+| `OPENAI_API_KEY` | —                           | Optional key for dynamic topologies/injections    |
+| `HF_TOKEN`       | required by `inference.py`  | Inference script API key; also accepted by server |
+| `API_KEY`        | —                           | Alternative server API key env var                |
 | `API_BASE_URL`   | `https://api.openai.com/v1` | LLM endpoint — supports any OpenAI-compatible API |
 | `MODEL_NAME`     | `gpt-5.4`                   | Model used by `inference.py`                      |
 | `PHANTOM_ENV`    | —                           | Set to `production` in Dockerfile                 |
