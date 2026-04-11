@@ -352,6 +352,36 @@ python inference.py
 
 The script runs all three tasks sequentially with the full TriPlay-RL system active. The Attacker adapts across all three tasks using the shared in-memory curriculum. Emits structured `[START]`, `[STEP]`, and `[END]` lines to stdout as required by the OpenEnv evaluation harness.
 
+**Verified output (gpt-5.4, seed=0):**
+
+```
+[START] task=task_containment env=phantom model=gpt-5.4
+[STEP] step=1 action=scan_host('db-01') reward=0.10 done=false error=null
+[STEP] step=2 action=scan_host('fw-01') reward=0.10 done=false error=null
+[STEP] step=3 action=scan_host('app-01') reward=0.09 done=false error=null
+[STEP] step=4 action=isolate_host('app-01') reward=0.43 done=false error=null
+...
+[END] success=true steps=15 score=0.88 rewards=0.10,0.10,0.09,0.43,...
+
+[START] task=task_adaptive env=phantom model=gpt-5.4
+[STEP] step=1 action=scan_host('db-01') reward=0.10 done=false error=null
+...
+[END] success=true steps=25 score=0.40 rewards=0.10,0.10,0.10,0.09,...
+
+[START] task=task_cognitive_warfare env=phantom model=gpt-5.4
+[STEP] step=1 action=scan_host('backup-01') reward=0.10 done=false error=null
+...
+[END] success=true steps=40 score=0.40 rewards=0.10,0.10,0.10,0.10,...
+```
+
+| Task | Steps | Score | Success |
+|---|---|---|---|
+| `task_containment` | 15/15 | **0.88** | ✅ |
+| `task_adaptive` | 25/25 | **0.40** | ✅ |
+| `task_cognitive_warfare` | 40/40 | **0.40** | ✅ |
+
+All three tasks pass their success thresholds (0.50 / 0.35 / 0.25) with the active TriPlay-RL Attacker running.
+
 ### Run the Reference Agent
 
 ```bash
