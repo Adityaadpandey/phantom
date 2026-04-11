@@ -407,7 +407,15 @@ pytest tests/test_siem.py       # injection engine
 
 ---
 
+## Deployment to Hugging Face
 
+```bash
+openenv push --repo-id Adpandey/phantomx --exclude .hfignore
+```
+
+The two-stage Dockerfile installs all dependencies in a builder stage and produces a lean production image. The `venv/` directory is excluded by `.hfignore` — pass `--exclude .hfignore` or the full venv will be uploaded.
+
+---
 
 ## Citation
 
