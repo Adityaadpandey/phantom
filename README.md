@@ -119,7 +119,7 @@ Across the three inference tasks, the curriculum carries over in-memory: weaknes
 
 ---
 
-## Why PHANTOM is a Winning Hackathon Entry
+## Why PHANTOM
 
 | Capability | CyberBench / SecEval | NetSecGame | PHANTOM |
 |---|---|---|---|
