@@ -223,11 +223,16 @@ class SIEMBus:
         turn: int,
         newly_compromised: list[str],
         injection_cache: list[SIEMEvent] | None = None,
+        forced_injection: "SIEMEvent | None" = None,
     ) -> list[SIEMEvent]:
         events: list[SIEMEvent] = []
         events.extend(self._emit_noise(turn))
         events.extend(self._emit_attack_logs(turn, newly_compromised))
-        if self.rng.random() < self.injection_rate:
+
+        if forced_injection is not None:
+            # AttackerAgent-provided injection — always included, bypass rate check
+            events.append(forced_injection)
+        elif self.rng.random() < self.injection_rate:
             if injection_cache:
                 # Use pre-generated LLM injection, stamp with current turn
                 inj = injection_cache.pop(0)

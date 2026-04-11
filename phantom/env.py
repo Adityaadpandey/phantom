@@ -1,6 +1,7 @@
 from __future__ import annotations
 import asyncio
 import random
+from typing import TYPE_CHECKING
 from phantom.models import (
     Action, ActionType, Observation, Reward, HostStatus, HostView, SIEMEvent
 )
@@ -106,7 +107,11 @@ class PhantomEnv:
 
     # ── Step ──────────────────────────────────────────────────────────────────
 
-    def step(self, action: Action) -> tuple[Observation, Reward]:
+    def step(
+        self,
+        action: Action,
+        attacker_injection: "SIEMEvent | None" = None,
+    ) -> tuple[Observation, Reward]:
         self._turn += 1
 
         result = self._execute_action(action)
@@ -116,6 +121,7 @@ class PhantomEnv:
             turn=self._turn,
             newly_compromised=newly_compromised,
             injection_cache=self._injection_cache if self._injection_cache else None,
+            forced_injection=attacker_injection,
         )
         self._last_emitted = logs
         self._all_emitted.extend(logs)
