@@ -11,25 +11,25 @@ import argparse
 import os
 import uvicorn
 
-from phantom.api import app  # noqa: F401 — re-export for uvicorn
+from phantom.api import app
 
 
-def main(host: str = "0.0.0.0", port: int | None = None) -> None:
+def main() -> None:
     """Start the PHANTOM OpenEnv server."""
-    if port is None:
-        port = int(os.getenv("API_PORT", "7860"))
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--host", default="0.0.0.0")
+    parser.add_argument("--port", type=int, default=None)
+    args = parser.parse_args()
+
+    port = args.port if args.port is not None else int(os.getenv("API_PORT", "7860"))
 
     uvicorn.run(
         "server.app:app",
-        host=host,
+        host=args.host,
         port=port,
         log_level="info",
     )
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--host", default="0.0.0.0")
-    parser.add_argument("--port", type=int, default=None)
-    args = parser.parse_args()
-    main(host=args.host, port=args.port)
+    main()
