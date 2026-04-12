@@ -134,6 +134,8 @@ class PhantomEnv:
             emitted_logs=logs,
             all_emitted_logs=self._all_emitted,
             newly_compromised=newly_compromised,
+            episode_techniques=self._siem.episode_techniques,
+            active_edges=self._attack.get_active_edges(),
         )
 
         obs = self._build_observation(previous_action_result=result, logs=logs)

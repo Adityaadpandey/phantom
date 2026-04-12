@@ -61,3 +61,13 @@ class AttackEngine:
     @property
     def current_phase(self) -> str:
         return _PHASES[self._phase_index]
+
+    def get_active_edges(self) -> set[tuple[str, str]]:
+        """Edges where lateral movement could spread this turn: (compromised, vulnerable_neighbor)."""
+        edges: set[tuple[str, str]] = set()
+        for hid in self.network.compromised_hosts():
+            for neighbor in self.network.get_neighbors(hid):
+                nh = self.network.hosts[neighbor]
+                if not nh.is_compromised and not nh.is_isolated and not nh.is_patched:
+                    edges.add((hid, neighbor))
+        return edges
