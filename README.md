@@ -33,6 +33,7 @@ tags:
 
 ---
 
+<<<<<<< HEAD
 ## The 30-Second Pitch
 
 > **Most cybersecurity benchmarks test what an agent *knows*. PHANTOM tests whether it can still *think* when a co-evolving adversary is gaslighting it in real time.**
@@ -41,6 +42,14 @@ Existing benchmarks (CyberBench, NetSecGame, SecEval) measure recall and procedu
 
 ### What's inside
 
+=======
+> **Most cybersecurity benchmarks test what an agent *knows*. PHANTOM tests whether it can still *think* when a co-evolving adversary is gaslighting it in real time.**
+
+Existing benchmarks (CyberBench, NetSecGame, SecEval) measure recall and procedural accuracy. None of them pit the defender against an **adaptive opponent that reads its playbook**. PHANTOM does. The result is the first OpenEnv benchmark that measures **epistemic integrity under adversarial pressure** — the capability that matters most as LLM-based SOCs go into production in 2026.
+
+### What's inside
+
+>>>>>>> 503de5f (fixes:)
 - 🎭 **Live RL Attacker** — generates deceptive SIEM logs turn-by-turn via GRPO group sampling, adapts to the Defender's specific weaknesses
 - 🧭 **Adaptive Curriculum** — softmax-weighted weakness EMA automatically saturates the Defender's blind spots (Red Queen dynamics)
 - ⚖️ **LLM-as-Judge Evaluator** — scores both agents after each episode with a neutral referee prompt
