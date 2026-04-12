@@ -52,9 +52,28 @@ class PhantomEnvClient(
         return {"action": payload}
 
     def _parse_result(self, payload: Dict) -> StepResult[PhantomObservation]:
-        """Parse server step response into StepResult[PhantomObservation]."""
-        obs_data = payload.get("observation", {})
-        reward_data = payload.get("reward", {})
+        """Parse server step response into StepResult[PhantomObservation].
+
+        The server returns `reward` as a float and `done` as a bool at the
+        top level of the step response (see StepResponse in phantom/api.py).
+        For reset responses, the payload IS the observation dict directly.
+        """
+        if "observation" in payload:
+            obs_data = payload["observation"]
+            reward = payload.get("reward")
+            done = payload.get("done", False)
+        else:
+            obs_data = payload
+            reward = None
+            done = False
+
+        # Guard against a dict-shaped reward (future schema change)
+        if isinstance(reward, dict):
+            reward = reward.get("total")
+            done = payload.get("reward", {}).get("episode_done", done) if isinstance(payload.get("reward"), dict) else done
+
+        reward_float = float(reward) if reward is not None else 0.0
+        reward_float = max(0.0, min(1.0, reward_float))
 
         observation = PhantomObservation(
             turn=obs_data.get("turn", 0),
@@ -66,14 +85,14 @@ class PhantomEnvClient(
             previous_action_result=obs_data.get("previous_action_result"),
             task_id=obs_data.get("task_id", ""),
             task_description=obs_data.get("task_description", ""),
-            done=reward_data.get("episode_done", False),
-            reward=reward_data.get("total"),
+            done=bool(done),
+            reward=reward_float,
         )
 
         return StepResult(
             observation=observation,
-            reward=reward_data.get("total"),
-            done=reward_data.get("episode_done", False),
+            reward=reward_float,
+            done=bool(done),
         )
 
     def _parse_state(self, payload: Dict) -> State:
