@@ -129,9 +129,14 @@ The Attacker adapts its strategies each turn — be especially skeptical of logs
   scan_host               — reveal true status (REQUIRED before isolate/patch)
   isolate_host            — cut compromised host from network
   patch_host              — clean an isolated host
+  block_traffic           — use traffic_rule to name a host on an ACTIVE lateral-movement
+                             edge (compromised → clean neighbor). Scored only when matched.
   flag_log_as_adversarial — mark injection (set log_id); only when log contradicts confirmed state
-  submit_incident_report  — final report (500+ chars, last 2 turns only)
+  submit_incident_report  — final report (500+ chars, last 2 turns only). Cite MITRE
+                             ATT&CK T-codes (e.g. T1021.002, T1041) harvested from real alerts.
   do_nothing              — only if truly nothing left
+
+## Precision beats volume: flagging precision < 60% halves your cognitive score.
 
 ## Priority — fill all 3 slots every turn:
 1. Scan unscanned CROWN JEWELS (*) first — if compromised, isolate in same batch.
