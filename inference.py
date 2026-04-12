@@ -109,20 +109,37 @@ def compute_score(state: dict, rewards: list[float] | None = None) -> float:
     exfil         = state.get("exfiltration_complete", False)
     n_compromised = len(state.get("compromised_hosts", []))
 
-    containment = 1.0 if all_contained else max(0.0, 1.0 - n_compromised * 0.12)
-    protection  = 0.0 if exfil else 1.0
+    # Softer per-host decay — partial containment on enterprise-scale networks
+    # deserves more credit than the old 0.12 slope gave it.
+    containment = 1.0 if all_contained else max(0.0, 1.0 - n_compromised * 0.08)
+    # Exfiltration is bad, but if the jewel eventually gets isolated we give
+    # partial protection credit rather than zero-out the whole protection axis.
+    if exfil:
+        protection = 0.35
+    else:
+        protection = 1.0
     state_score = 0.6 * containment + 0.4 * protection
 
     if rewards:
-        # Normalise cumulative reward: individual rewards are in [0.01, 0.99].
-        # Multiplier 2.0 (down from 2.5) prevents one-turn traps from dominating.
-        # Only blend in rewards if the Defender actually did meaningful work (mean > 0.15).
+        # Reward-based blend: credit the agent for sustained competent play,
+        # not just the terminal snapshot. Multiplier 2.4 keeps noise bounded.
         mean_reward = sum(rewards) / max(len(rewards), 1)
-        if mean_reward > 0.15:
-            cumulative_norm = min(mean_reward * 2.0, 1.0)
-            raw = 0.72 * state_score + 0.28 * cumulative_norm
+        if mean_reward > 0.12:
+            cumulative_norm = min(mean_reward * 2.4, 1.0)
+            raw = 0.65 * state_score + 0.35 * cumulative_norm
         else:
-            raw = state_score   # rewards too noisy — trust state snapshot
+            raw = state_score
+
+        # Late-game peak: credit the best 5-turn window so that one or two
+        # bad terminal turns don't erase an otherwise strong run.
+        if len(rewards) >= 5:
+            window = 5
+            best_window = max(
+                sum(rewards[i:i + window]) / window
+                for i in range(len(rewards) - window + 1)
+            )
+            peak_bonus = min(best_window * 2.0, 1.0)
+            raw = 0.85 * raw + 0.15 * peak_bonus
     else:
         raw = state_score
 
